@@ -6,17 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server.js"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "pg": "^8.16.3",
+    "express": "^4.19.2",
+    "pg": "^8.11.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    "typescript": "~5.8.2",
+    "typescript": "^5.8.2",
     "vite": "^6.2.0"
   }
 }
