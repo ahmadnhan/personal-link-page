@@ -1,26 +1,30 @@
 import express from "express";
 import path from "path";
-import { fileURLToPath } from "url";
 import { Pool } from "pg";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname  = path.dirname(__filename);
 
+const app  = express();
 const PORT = process.env.PORT || 8080;
 
-// SSL لبوستجرس على Railway فقط (لا محليًا)
+// JSON
+app.use(express.json({ limit: "10mb" }));
+
+// اتصال Postgres
 const ssl =
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("localhost")
     ? { rejectUnauthorized: false }
-    : undefined;
+    : false;
 
-const db = new Pool({ connectionString: process.env.DATABASE_URL, ssl });
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl,
+});
 
-const app = express();
-app.use(express.json({ limit: "20mb" }));
-
-// ================== API ==================
-app.get("/api/test-db", async (_req, res) => {
+// ------------ API (تحت /api) ------------
+app.get("/api/test-db", async (req, res) => {
   try {
     const { rows } = await db.query("SELECT NOW() AS now");
     res.json({ ok: true, now: rows[0].now });
@@ -35,9 +39,10 @@ app.post("/api/save-link", async (req, res) => {
     if (!filename || !url) {
       return res.status(400).json({ ok: false, error: "filename & url required" });
     }
-    const sizeNum = Number.isFinite(+size) ? +size : null;
+    const sizeNum = Number.isFinite(size) ? size : null;
     await db.query(
-      "INSERT INTO files (filename, url, mimetype, size_bytes) VALUES ($1, $2, $3, $4)",
+      `INSERT INTO files (filename, url, mimetype, size_bytes)
+       VALUES ($1, $2, $3, $4)`,
       [filename, url, mimetype || null, sizeNum]
     );
     res.json({ ok: true });
@@ -46,25 +51,30 @@ app.post("/api/save-link", async (req, res) => {
   }
 });
 
-app.get("/api/files", async (_req, res) => {
+app.get("/api/files", async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT id, filename, url, mimetype, size_bytes, created_at
-       FROM files ORDER BY id DESC LIMIT 200`
+         FROM files
+     ORDER BY id DESC
+        LIMIT 200`
     );
     res.json(rows);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
+// ---------------------------------------
 
-// ============ ملفات الواجهة (Vite build) ============
+// ملفات الواجهة (Vite build)
 const staticDir = path.join(__dirname, "dist");
 app.use(express.static(staticDir));
 
-// SPA fallback: يخدم index.html لأي مسار "ليس API" و"ليس asset بامتداد"
-app.get(/^(?!\/api)(?!.*\.\w+$).*/, (_req, res) => {
+// SPA fallback — يبقى دائمًا بعد مسارات /api
+app.get("*", (req, res) => {
   res.sendFile(path.join(staticDir, "index.html"));
 });
 
-app.listen(PORT, "0.0.0.0", () => console.log("Server running on", PORT));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on", PORT);
+});
