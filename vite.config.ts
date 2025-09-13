@@ -3,6 +3,6 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/",            // <- مهم جداً: اجعلها "/" وليس مساراً فرعياً
-  build: { outDir: "dist" },
+  base: "/",         // ضروري
+  build: { outDir: "dist" }
 });

@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8080;
 
-// SSL لبوستجرس (Railway) – يتعطّل محليًا
+// SSL لبوستجرس على Railway فقط (لا محليًا)
 const ssl =
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("localhost")
     ? { rejectUnauthorized: false }
@@ -19,7 +19,7 @@ const db = new Pool({ connectionString: process.env.DATABASE_URL, ssl });
 const app = express();
 app.use(express.json({ limit: "20mb" }));
 
-// ===== API =====
+// ================== API ==================
 app.get("/api/test-db", async (_req, res) => {
   try {
     const { rows } = await db.query("SELECT NOW() AS now");
@@ -58,11 +58,11 @@ app.get("/api/files", async (_req, res) => {
   }
 });
 
-// ===== Static (Vite build) =====
+// ============ ملفات الواجهة (Vite build) ============
 const staticDir = path.join(__dirname, "dist");
 app.use(express.static(staticDir));
 
-// SPA fallback لغير /api ولغير ملفات الـ assets (التي فيها نقطة مثل .js/.css)
+// SPA fallback: يخدم index.html لأي مسار "ليس API" و"ليس asset بامتداد"
 app.get(/^(?!\/api)(?!.*\.\w+$).*/, (_req, res) => {
   res.sendFile(path.join(staticDir, "index.html"));
 });
