@@ -1,30 +1,33 @@
+// server.js (ESM)
 import express from "express";
 import path from "path";
 import { Pool } from "pg";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
-const app  = express();
 const PORT = process.env.PORT || 8080;
 
-// JSON
-app.use(express.json({ limit: "10mb" }));
-
-// اتصال Postgres
-const ssl =
+// إعداد اتصال Postgres
+const useSSL =
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("localhost")
     ? { rejectUnauthorized: false }
-    : false;
+    : undefined;
 
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl,
+  ssl: useSSL,
 });
 
-// ------------ API (تحت /api) ------------
-app.get("/api/test-db", async (req, res) => {
+const app = express();
+app.use(express.json({ limit: "10mb" }));
+
+// ---------------- API تحت /api ----------------
+const api = express.Router();
+
+// فحص الاتصال بقاعدة البيانات
+api.get("/test-db", async (_req, res) => {
   try {
     const { rows } = await db.query("SELECT NOW() AS now");
     res.json({ ok: true, now: rows[0].now });
@@ -33,13 +36,14 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
-app.post("/api/save-link", async (req, res) => {
+// حفظ رابط/ملف (اسم، رابط، نوع، حجم اختياري)
+api.post("/save-link", async (req, res) => {
   try {
     const { filename, url, mimetype, size } = req.body || {};
     if (!filename || !url) {
       return res.status(400).json({ ok: false, error: "filename & url required" });
     }
-    const sizeNum = Number.isFinite(size) ? size : null;
+    const sizeNum = Number.isFinite(+size) ? +size : null;
     await db.query(
       `INSERT INTO files (filename, url, mimetype, size_bytes)
        VALUES ($1, $2, $3, $4)`,
@@ -51,30 +55,33 @@ app.post("/api/save-link", async (req, res) => {
   }
 });
 
-app.get("/api/files", async (req, res) => {
+// إرجاع آخر الملفات
+api.get("/files", async (_req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT id, filename, url, mimetype, size_bytes, created_at
-         FROM files
-     ORDER BY id DESC
-        LIMIT 200`
+       FROM files
+       ORDER BY id DESC
+       LIMIT 200`
     );
     res.json(rows);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
-// ---------------------------------------
 
-// ملفات الواجهة (Vite build)
+app.use("/api", api);
+// -------------- نهاية API ---------------------
+
+// ملفات Vite المبنية
 const staticDir = path.join(__dirname, "dist");
 app.use(express.static(staticDir));
 
-// SPA fallback — يبقى دائمًا بعد مسارات /api
-app.get("*", (req, res) => {
+// SPA Fallback — لازم يكون آخر Route
+app.get("*", (_req, res) => {
   res.sendFile(path.join(staticDir, "index.html"));
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on", PORT);
+  console.log(`Server running on ${PORT}`);
 });
