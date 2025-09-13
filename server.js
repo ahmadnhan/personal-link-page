@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8080;
 
-// SSL لبوستجرس على Railway (يتعطّل محليًا)
+// SSL لبوستجرس (Railway) – يتعطّل محليًا
 const ssl =
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("localhost")
     ? { rejectUnauthorized: false }
@@ -19,7 +19,7 @@ const db = new Pool({ connectionString: process.env.DATABASE_URL, ssl });
 const app = express();
 app.use(express.json({ limit: "20mb" }));
 
-// ------- API -------
+// ===== API =====
 app.get("/api/test-db", async (_req, res) => {
   try {
     const { rows } = await db.query("SELECT NOW() AS now");
@@ -32,10 +32,12 @@ app.get("/api/test-db", async (_req, res) => {
 app.post("/api/save-link", async (req, res) => {
   try {
     const { filename, url, mimetype, size } = req.body || {};
-    if (!filename || !url) return res.status(400).json({ ok: false, error: "filename & url required" });
+    if (!filename || !url) {
+      return res.status(400).json({ ok: false, error: "filename & url required" });
+    }
     const sizeNum = Number.isFinite(+size) ? +size : null;
     await db.query(
-      `INSERT INTO files (filename, url, mimetype, size_bytes) VALUES ($1, $2, $3, $4)`,
+      "INSERT INTO files (filename, url, mimetype, size_bytes) VALUES ($1, $2, $3, $4)",
       [filename, url, mimetype || null, sizeNum]
     );
     res.json({ ok: true });
@@ -56,12 +58,12 @@ app.get("/api/files", async (_req, res) => {
   }
 });
 
-// ------- Static (Vite build) -------
+// ===== Static (Vite build) =====
 const staticDir = path.join(__dirname, "dist");
 app.use(express.static(staticDir));
 
-// SPA fallback لغير /api فقط
-app.get(/^\/(?!api).*/, (_req, res) => {
+// SPA fallback لغير /api ولغير ملفات الـ assets (التي فيها نقطة مثل .js/.css)
+app.get(/^(?!\/api)(?!.*\.\w+$).*/, (_req, res) => {
   res.sendFile(path.join(staticDir, "index.html"));
 });
 
